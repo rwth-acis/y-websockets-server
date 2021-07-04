@@ -1,3 +1,13 @@
+**Modifications of rwth-acis fork for project service**:
+
+This variant of the y-websockets-server adds secured rooms for projects created with the las2peer-project-service.
+For every project in every system there is one Yjs room that only the project members are allowed to join.
+This room is named "projects_{system}_{projectName}".
+To join this room, a client needs to send auth information.
+This will be used by the extended y-websockets-server to send a request to the project service to verify that the user has access to the project, and therefore is allowed to join the Yjs room.
+
+The docker container contains an environment variable PROJECT_SERVICE_URL that should be set to the address of the webconnector (with port) where the project-service can be found.
+
 # Websockets Connector for [Yjs](https://github.com/y-js/yjs) (Server)
 
 *y-websockets-server* is the connection point for *y-websockets-client*. It saves the shared data (using the [memory](https://github.com/y-js/y-memory) or the [leveldb](https://github.com/y-js/y-leveldb) database adapter), and distributes it efficiently to all connected clients.

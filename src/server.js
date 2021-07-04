@@ -3,6 +3,7 @@
 'use strict'
 
 var Y = require('yjs')
+const fetch = require('node-fetch')
 
 Y.debug.log = console.log.bind(console)
 
@@ -56,18 +57,71 @@ function getInstanceOfY (room) {
   return global.yInstances[room]
 }
 
-io.on('connection', function (socket) {
+io.on('connection', async function (socket) {
   var rooms = []
-  socket.on('joinRoom', function (room) {
-    log('User "%s" joins room "%s"', socket.id, room)
-    socket.join(room)
-    getInstanceOfY(room).then(function (y) {
-      global.y = y // TODO: remove !!!
-      if (rooms.indexOf(room) === -1) {
-        y.connector.userJoined(socket.id, 'slave')
-        rooms.push(room)
+  socket.on('joinRoom', async function (room, authInfo) {
+    if (room.startsWith('projects_')) {
+      // we expect the following format: projects_{system}_{projectName}
+      var roomNameParts = room.split('_', 3)
+      if (roomNameParts.length !== 3) {
+        console.error('Room name starts with projects_ but is not well formatted.')
+        socket.disconnect()
+      } else {
+        // extract system name and project name from the room name
+        let system = roomNameParts[1]
+        let projectName = roomNameParts[2]
+
+        // send GET request to fetch the given project in the given system
+        // therefore use the authInfo given by the user (to check if access to project is granted)
+        await fetch('{PROJECT_SERVICE_URL}/projects/' + system + '/' + projectName, {
+          method: 'GET',
+          headers: {
+            'access-token': authInfo.accessToken,
+            'Authorization': 'Basic ' + authInfo.basicAuth,
+            'Content-Type': 'application/json'
+          }
+        }).then((response) => {
+          if (!response.ok) {
+            throw new Error('Project service is unavailable or user has no access to project.' + response.status)
+          }
+          return response
+        }).then(async (response) => {
+          const data = await response.json()
+          const isMember = data.is_member
+          if (isMember) {
+            // user has access to project
+            log('User "%s" joins room "%s"', socket.id, room)
+            socket.join(room)
+            getInstanceOfY(room).then(function (y) {
+              global.y = y // TODO: remove !!!
+              if (rooms.indexOf(room) === -1) {
+                y.connector.userJoined(socket.id, 'slave')
+                rooms.push(room)
+              }
+            })
+          } else {
+            console.log('user is no member')
+            // user is no member
+            socket.disconnect()
+          }
+        }).catch((error) => {
+          console.error('error fetching project', error)
+          // user has no access to project
+          socket.disconnect()
+        })
       }
-    })
+    } else {
+      // currently: allow other room names to be open for everyone
+      log('User "%s" joins room "%s"', socket.id, room)
+      socket.join(room)
+      getInstanceOfY(room).then(function (y) {
+        global.y = y // TODO: remove !!!
+        if (rooms.indexOf(room) === -1) {
+          y.connector.userJoined(socket.id, 'slave')
+          rooms.push(room)
+        }
+      })
+    }
   })
   socket.on('yjsEvent', function (msg) {
     if (msg.room != null) {
