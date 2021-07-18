@@ -97,6 +97,11 @@ io.on('connection', async function (socket) {
               if (rooms.indexOf(room) === -1) {
                 y.connector.userJoined(socket.id, 'slave')
                 rooms.push(room)
+
+                log('Sending join finished message 1')
+                y.connector.send(socket.id, {
+                    type: 'userJoined called'
+                  })
               }
             })
           } else {
@@ -119,6 +124,11 @@ io.on('connection', async function (socket) {
         if (rooms.indexOf(room) === -1) {
           y.connector.userJoined(socket.id, 'slave')
           rooms.push(room)
+
+          log('Sending join finished message 2')
+          y.connector.send(socket.id, {
+              type: 'userJoined called'
+            })
         }
       })
     }
